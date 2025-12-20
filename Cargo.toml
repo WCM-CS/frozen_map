@@ -1,0 +1,8 @@
+[package]
+name = "frozen_map"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitvec = "1.0.1"
+ph = {version = "0.10.0", features = ["gxhash", "sux"] }
