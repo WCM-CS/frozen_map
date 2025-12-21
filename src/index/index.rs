@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
@@ -73,10 +73,13 @@ impl<K> WithKeys<K>
 where  
     K: Hash + Eq + Send + Sync + Clone + Default,
 {
-    pub fn new(keys: Vec<K>) -> Self {
+    pub fn new_from_uninit(keys: Vec<MaybeUninit<K>>) -> Self {
         let arena = Bump::new();
-        let alloc_keys = arena.alloc_slice_clone(keys.as_slice());
-        let keys_ptr = alloc_keys as *const [K] as *const [K]; // fat pointer
+        let arena_keys: &mut [K] = arena.alloc_slice_fill_with(keys.len(), |i| unsafe {
+            keys[i].assume_init_read() // moves the value out of MaybeUninit
+        });
+
+        let keys_ptr = arena_keys as *const [K];
 
         Self {
             _arena_handle: arena,
