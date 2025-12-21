@@ -14,13 +14,12 @@ use crate::store::prelude::*;
 // AtomicVerifiedFrozenMap   // highest overhead // thread safe // key verification
 
 
-#[repr(C)]
 pub struct AtomicVerifiedFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
 {
-    index: VerifiedIndex<K>,
+    index: Arc<VerifiedIndex<K>>,
     store: AtomicStore<V>
 }
 
@@ -60,22 +59,15 @@ where
             sorted_keys[idx].write(key.clone());
         });
 
-        let slice_keys: Vec<K> = unsafe {
-            sorted_keys
-                .into_iter()
-                .map(|u| u.assume_init())
-                .collect()
-        };
-
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(slice_keys)
+            keys: WithKeys::new_from_uninit(sorted_keys)
         };
 
         let store = AtomicStore::new(keys.len());
         
         Self {
-            index: frozen_index,
+            index: Arc::new(frozen_index),
             store
         }
     }
@@ -84,8 +76,12 @@ where
     pub fn get(&self, key: &K) -> Option<Arc<V>> {
         let idx = self.index.get_index(key);
 
-        if self.index.keys.get(idx)!= key {
-            return None
+        if self.index.keys.dead_key(idx) {
+            return None;
+        }
+
+        if self.index.keys.get(idx) != key {
+            return None;
         }
 
         self.store.get_value(idx)
@@ -97,14 +93,18 @@ where
     }
 
     #[inline]
-    pub fn upsert(&mut self, key: K, value: V) -> Result<(), &str>{
+    pub fn upsert(&self, key: K, value: V) -> Result<(), &str>{
         let idx = self.index.get_index(&key);
+
+        if self.index.keys.dead_key(idx) {
+            return Err("Dead key")
+        }
 
         if self.index.keys.get(idx) == &key {
             self.store.update(idx, value);
-            Ok(())
+            return Ok(())
         } else {
-            Err("Failed to upsert, key does not exist")
+            return Err("Failed to upsert, key does not exist")
         }
     }
 

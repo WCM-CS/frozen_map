@@ -1,10 +1,11 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
     seeds::{BitsFast}
 };
 use bumpalo::{Bump};
+use bitvec::{ vec::BitVec, bitvec };
 
 
 type Index = Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, BuildDefaultSeededHasher>;
@@ -12,7 +13,7 @@ type Index = Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, 
 pub type VerifiedIndex<K> = FrozenIndex<WithKeys<K>>;
 pub type UnverifiedIndex<K> = FrozenIndex<NoKeys<K>>;
 
-#[repr(C)]
+
 pub struct FrozenIndex<S>
 where
     S: KeyStorage,
@@ -38,20 +39,19 @@ where
     }
 }
 
-impl<'a, K> FrozenIndex<WithKeys<K>> 
+impl<K> FrozenIndex<WithKeys<K>> 
 where 
     K: Hash + Eq + Clone + Send + Sync + Default,
 {
     #[inline]
     pub fn contains_key(&self, key: &K) -> bool {
         let idx = self.get_index(key);
-        let x = self.keys.get(idx);
 
-        if x == key {
-            true
-        } else {
-            false
-        }
+        if self.keys.dead_key(idx) {
+            return false;
+        } 
+
+        self.keys.get(idx) == key
     }
 }
 
@@ -61,33 +61,48 @@ pub trait KeyStorage {
 
     fn get(&self, idx: usize) -> &Self::Key;
     fn len(&self) -> usize;
+    fn kill(&mut self, idx: usize);
+    fn rehydrate(&mut self, idx: usize);
+    fn dead_key(&self, idx: usize) -> bool;
 }
+
 
 pub struct WithKeys<K> {
     #[allow(dead_code)]
     _arena_handle: Bump,
     keys_ptr: *const [K],
+    len: usize,
+    tombstone: BitVec
 }
 
 impl<K> WithKeys<K> 
 where  
     K: Hash + Eq + Send + Sync + Clone + Default,
 {
-    pub fn new(keys: Vec<K>) -> Self {
+    pub fn new_from_uninit(keys: Vec<MaybeUninit<K>>) -> Self {
         let arena = Bump::new();
-        let alloc_keys = arena.alloc_slice_clone(keys.as_slice());
-        let keys_ptr = alloc_keys as *const [K] as *const [K]; // fat pointer
+        let arena_keys: &mut [K] = arena.alloc_slice_fill_with(keys.len(), |i| unsafe {
+            keys[i].assume_init_read() // moves the value out of MaybeUninit
+        });
+
+        let keys_ptr = arena_keys as *const [K];
+        let tombstone = bitvec![1; keys.len()];
 
         Self {
             _arena_handle: arena,
             keys_ptr,
+            len: keys.len(),
+            tombstone
         }
     }
 }
 
+// should these be repr c structs?
+
 pub struct NoKeys<K> {
     _ghost: PhantomData<K>,
-    len: usize
+    len: usize,
+    tombstone: BitVec
 }
 
 impl<K> NoKeys<K> {
@@ -95,6 +110,7 @@ impl<K> NoKeys<K> {
         Self {
             _ghost: PhantomData,
             len,
+            tombstone: bitvec![1; len]
         }
     }
 }
@@ -109,7 +125,24 @@ impl<K> KeyStorage for WithKeys<K> {
 
     #[inline]
     fn len(&self) -> usize {
-        unsafe { (&(*self.keys_ptr)).len() }
+        self.len
+    }
+
+    #[inline]
+    fn kill(&mut self, idx: usize) {
+        self.tombstone.set(idx, false);
+        self.len -= 1;
+    }
+
+    #[inline]
+    fn rehydrate(&mut self, idx: usize) {
+        self.tombstone.set(idx, true);
+        self.len += 1;
+    }
+
+    #[inline]
+    fn dead_key(&self, idx: usize) -> bool {
+        !self.tombstone[idx]
     }
 }
 
@@ -124,6 +157,23 @@ impl<K> KeyStorage for NoKeys<K> {
     #[inline]
     fn len(&self) -> usize {
         self.len
+    }
+
+    #[inline]
+    fn kill(&mut self, idx: usize) {
+        self.tombstone.set(idx, false);
+        self.len -= 1;
+    }
+
+    #[inline]
+    fn rehydrate(&mut self, idx: usize) {
+        self.tombstone.set(idx, true);
+        self.len += 1;
+    }
+
+    #[inline]
+    fn dead_key(&self, idx: usize) -> bool {
+        !self.tombstone[idx]
     }
 }
 

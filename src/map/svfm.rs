@@ -15,7 +15,6 @@ use crate::store::prelude::*;
 
 //  SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
 
-#[repr(C)]
 pub struct SyncVerifiedFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
@@ -68,16 +67,9 @@ where
             init_bloom.set(idx, true);
         });
 
-        let slice_keys: Vec<K> = unsafe {
-            sorted_keys
-                .into_iter()
-                .map(|u| u.assume_init())
-                .collect()
-        };
-
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(slice_keys)
+            keys: WithKeys::new_from_uninit(sorted_keys)
         };
 
         let store = SyncStore::new(sorted_values, init_bloom);
@@ -117,17 +109,9 @@ where
             sorted_keys[idx].write(key);
         });
 
-        let slice_keys: Vec<K> = unsafe {
-            sorted_keys
-                .into_iter()
-                .map(|u| u.assume_init())
-                .collect()
-        };
-
-        
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(slice_keys)
+            keys: WithKeys::new_from_uninit(sorted_keys)
         };
 
         let store = SyncStore::new(sorted_values, init_bloom);
@@ -142,8 +126,12 @@ where
     pub fn get(&self, key: &K) -> Option<&V> {
         let idx = self.index.get_index(key);
 
-        if self.index.keys.get(idx)!= key {
-            return None
+        if self.index.keys.dead_key(idx) {
+            return None;
+        }
+
+        if self.index.keys.get(idx) != key {
+            return None;
         }
 
         self.store.get_value(idx)
@@ -157,6 +145,10 @@ where
     #[inline]
     pub fn upsert(&mut self, key: K, value: V) -> Result<(), &str>{
         let idx = self.index.get_index(&key);
+
+        if self.index.keys.dead_key(idx) {
+            return Err("Dead key")
+        }
 
         if self.index.keys.get(idx) == &key {
             self.store.update(idx, value);

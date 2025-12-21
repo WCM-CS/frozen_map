@@ -3,7 +3,6 @@ use std::{ptr};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 
-#[repr(C)]
 pub struct AtomicStore<V>
 where
     V: Send + Sync + Clone + Default,
