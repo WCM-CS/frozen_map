@@ -93,7 +93,7 @@ where
     }
 
     #[inline]
-    pub fn upsert(&self, key: K, value: V) -> Result<(), &str>{
+    pub fn upsert(&self, key: K, value: V) -> Result<(), &str> {
         let idx = self.index.get_index(&key);
 
         if self.index.keys.dead_key(idx) {
@@ -107,6 +107,55 @@ where
             return Err("Failed to upsert, key does not exist")
         }
     }
+
+    // delete the value
+    #[inline]
+    pub fn drop_value(&self, key: &K) -> Result<(), &str> {
+        let idx = self.index.get_index(&key);
+
+        if self.index.keys.get(idx) == key {
+            self.store.remove_value(idx);
+            return Ok(())
+        } else {
+            return Err("Failed to drop value, key does not exist")
+        }
+    }
+
+    #[inline]
+    pub fn reap_key(&self, key: &K) -> Result<(), &str> {
+
+        let idx = self.index.get_index(&key);
+
+        if self.index.keys.dead_key(idx) {
+            return Err("Key is already dead")
+        }
+
+        if self.index.keys.get(idx) == key {
+            self.index.keys.kill(idx);
+            return Ok(())
+        } else {
+            return Err("Failed to kill key, key does not exist")
+        }
+    }
+
+    #[inline]
+    pub fn rehydrate(&self, key: &K) -> Result<(), &str> {
+
+        let idx = self.index.get_index(&key);
+
+        if !self.index.keys.dead_key(idx) {
+            return Err("Key is already alive")
+        }
+
+        if self.index.keys.get(idx) == key {
+            self.index.keys.rehydrate(idx);
+            return Ok(())
+        } else {
+            return Err("Failed to kill key, key does not exist")
+        }
+    }
+
+
 
     #[inline]
     pub fn len(&self) -> usize {

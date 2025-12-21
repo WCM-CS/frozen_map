@@ -135,6 +135,27 @@ where
     }
 
     #[inline]
+    pub fn drop_value(&mut self, key: &K) {
+        let idx = self.index.get_index(&key);
+
+        self.store.remove_value(idx);
+    }
+
+    #[inline]
+    pub fn reap_key(&self, key: &K) -> Result<(), &str> {
+        let idx = self.index.get_index(&key);
+
+        if self.index.keys.dead_key(idx) {
+            return Err("Key is already dead")
+        }
+
+        self.index.keys.kill(idx);
+        Ok(())
+    }
+
+
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.index.keys.len()
     }
