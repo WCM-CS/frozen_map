@@ -1,9 +1,10 @@
-use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
+use std::{hash::Hash, marker::PhantomData};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
     seeds::{BitsFast}
 };
+use bumpalo::{Bump};
 
 
 type Index = Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, BuildDefaultSeededHasher>;
@@ -37,7 +38,7 @@ where
     }
 }
 
-impl<K> FrozenIndex<WithKeys<K>> 
+impl<'a, K> FrozenIndex<WithKeys<K>> 
 where 
     K: Hash + Eq + Clone + Send + Sync + Default,
 {
@@ -62,20 +63,31 @@ pub trait KeyStorage {
     fn len(&self) -> usize;
 }
 
-#[repr(transparent)]
 pub struct WithKeys<K> {
-    keys: Vec<MaybeUninit<K>>
+    #[allow(dead_code)]
+    _arena_handle: Bump,
+    keys_ptr: *const [K],
 }
 
-impl<K> WithKeys<K> {
-    pub fn new(keys: Vec<MaybeUninit<K>>) -> Self {
-        Self { keys }
+impl<K> WithKeys<K> 
+where  
+    K: Hash + Eq + Send + Sync + Clone + Default,
+{
+    pub fn new(keys: Vec<K>) -> Self {
+        let arena = Bump::new();
+        let alloc_keys = arena.alloc_slice_clone(keys.as_slice());
+        let keys_ptr = alloc_keys as *const [K] as *const [K]; // fat pointer
+
+        Self {
+            _arena_handle: arena,
+            keys_ptr,
+        }
     }
 }
 
 pub struct NoKeys<K> {
     _ghost: PhantomData<K>,
-    pub len: usize
+    len: usize
 }
 
 impl<K> NoKeys<K> {
@@ -92,12 +104,12 @@ impl<K> KeyStorage for WithKeys<K> {
 
     #[inline]
     fn get(&self, idx: usize) -> &K {
-        unsafe { self.keys[idx].assume_init_ref() }
+        unsafe { &(*self.keys_ptr)[idx] }
     }
 
     #[inline]
     fn len(&self) -> usize {
-        self.keys.len()
+        unsafe { (&(*self.keys_ptr)).len() }
     }
 }
 
@@ -115,12 +127,3 @@ impl<K> KeyStorage for NoKeys<K> {
     }
 }
 
-impl<K> Drop for WithKeys<K> {
-    fn drop(&mut self) {
-        unsafe {
-            for k in &mut self.keys {
-                k.assume_init_drop();
-            }
-        }
-    }
-}

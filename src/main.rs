@@ -1,7 +1,6 @@
 use std::{collections::HashMap};
 
-use frozen_map::{AtomicUnverifiedFrozenMap, AtomicVerifiedFrozenMap, SyncUnverifiedFrozenMap, SyncVerifiedFrozenMap};
-
+use frozen_map::map::{ SyncUnverifiedFrozenMap, SyncVerifiedFrozenMap, AtomicUnverifiedFrozenMap, AtomicVerifiedFrozenMap };
 
 
 
@@ -10,7 +9,7 @@ use frozen_map::{AtomicUnverifiedFrozenMap, AtomicVerifiedFrozenMap, SyncUnverif
 
  AtomicUnverifiedFrozenMap  // medium overhead // thread safe // no key verification
 
- SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
+ SyncVerifiedFrozenMap    // higher overhead // not thread safe // key verification
 
  AtomicVerifiedFrozenMap    // highest overhead // thread safe // key verification
 */
@@ -31,7 +30,7 @@ fn main() {
 
     // Load in value
 
-    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
+    keys.iter().zip(values.iter()).for_each(|(key, val)| {
         let res = su.get(key);
         println!("res: {:?}", res);
 

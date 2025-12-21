@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 bitvec = "1.0.1"
+bumpalo = { version = "3.19.1", features = ["boxed"] }
 ph = {version = "0.10.0", features = ["gxhash", "sux"] }
