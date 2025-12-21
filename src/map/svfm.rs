@@ -77,7 +77,7 @@ where
 
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(&slice_keys)
+            keys: WithKeys::new(slice_keys)
         };
 
         let store = SyncStore::new(sorted_values, init_bloom);
@@ -125,10 +125,9 @@ where
         };
 
         
-
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(&slice_keys)
+            keys: WithKeys::new(slice_keys)
         };
 
         let store = SyncStore::new(sorted_values, init_bloom);

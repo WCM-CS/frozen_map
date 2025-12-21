@@ -1,10 +1,10 @@
-use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
+use std::{hash::Hash, marker::PhantomData};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
     seeds::{BitsFast}
 };
-use bumpalo::{Bump, boxed::Box};
+use bumpalo::{Bump};
 
 
 type Index = Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, BuildDefaultSeededHasher>;
@@ -64,7 +64,8 @@ pub trait KeyStorage {
 }
 
 pub struct WithKeys<K> {
-    arena: Bump,
+    #[allow(dead_code)]
+    _arena_handle: Bump,
     keys_ptr: *const [K],
 }
 
@@ -72,14 +73,13 @@ impl<K> WithKeys<K>
 where  
     K: Hash + Eq + Send + Sync + Clone + Default,
 {
-    pub fn new(keys: &[K]) -> Self {
+    pub fn new(keys: Vec<K>) -> Self {
         let arena = Bump::new();
-        let alloc_keys = arena.alloc_slice_clone(keys);
-        let keys_ptr = alloc_keys as *const [K];
-
+        let alloc_keys = arena.alloc_slice_clone(keys.as_slice());
+        let keys_ptr = alloc_keys as *const [K] as *const [K]; // fat pointer
 
         Self {
-            arena,
+            _arena_handle: arena,
             keys_ptr,
         }
     }

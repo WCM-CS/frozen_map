@@ -69,7 +69,7 @@ where
 
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(&slice_keys)
+            keys: WithKeys::new(slice_keys)
         };
 
         let store = AtomicStore::new(keys.len());
