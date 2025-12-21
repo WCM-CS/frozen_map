@@ -17,7 +17,6 @@ use crate::store::prelude::*;
 // AtomicUnverifiedFrozenMap  // medium overhead // is thread safe // no keys stored
 
 
-#[repr(C)]
 pub struct AtomicUnverifiedFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
@@ -75,7 +74,7 @@ where
     #[inline]
     pub fn get(&self, key: &K) -> Option<Arc<V>> {
         let idx = self.index.get_index(key);
-        
+
         if self.index.keys.dead_key(idx) {
             return None
         } 

@@ -14,7 +14,6 @@ use crate::store::prelude::*;
 // AtomicVerifiedFrozenMap   // highest overhead // thread safe // key verification
 
 
-#[repr(C)]
 pub struct AtomicVerifiedFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,

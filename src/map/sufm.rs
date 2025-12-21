@@ -17,7 +17,6 @@ use crate::store::prelude::*;
 // SyncUnverifiedFrozenMap  // lowest overhead //not thread safe // no key verification
 
 
-#[repr(C)]
 pub struct SyncUnverifiedFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,

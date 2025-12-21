@@ -2,7 +2,6 @@ use std::{mem::MaybeUninit};
 use bitvec::{ vec::BitVec };
 
 
-#[repr(C)]
 pub struct SyncStore<V>
 where
     V: Send + Sync + Clone + Default,

@@ -13,7 +13,7 @@ type Index = Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, 
 pub type VerifiedIndex<K> = FrozenIndex<WithKeys<K>>;
 pub type UnverifiedIndex<K> = FrozenIndex<NoKeys<K>>;
 
-#[repr(C)]
+
 pub struct FrozenIndex<S>
 where
     S: KeyStorage,
@@ -51,11 +51,7 @@ where
             return false;
         } 
 
-        if self.keys.get(idx) == key {
-            true
-        } else {
-            false
-        }
+        self.keys.get(idx) == key
     }
 }
 
@@ -65,9 +61,11 @@ pub trait KeyStorage {
 
     fn get(&self, idx: usize) -> &Self::Key;
     fn len(&self) -> usize;
-    fn delete(&mut self, idx: usize);
+    fn kill(&mut self, idx: usize);
+    fn rehydrate(&mut self, idx: usize);
     fn dead_key(&self, idx: usize) -> bool;
 }
+
 
 pub struct WithKeys<K> {
     #[allow(dead_code)]
@@ -131,9 +129,15 @@ impl<K> KeyStorage for WithKeys<K> {
     }
 
     #[inline]
-    fn delete(&mut self, idx: usize) {
+    fn kill(&mut self, idx: usize) {
         self.tombstone.set(idx, false);
         self.len -= 1;
+    }
+
+    #[inline]
+    fn rehydrate(&mut self, idx: usize) {
+        self.tombstone.set(idx, true);
+        self.len += 1;
     }
 
     #[inline]
@@ -156,9 +160,15 @@ impl<K> KeyStorage for NoKeys<K> {
     }
 
     #[inline]
-    fn delete(&mut self, idx: usize) {
+    fn kill(&mut self, idx: usize) {
         self.tombstone.set(idx, false);
         self.len -= 1;
+    }
+
+    #[inline]
+    fn rehydrate(&mut self, idx: usize) {
+        self.tombstone.set(idx, true);
+        self.len += 1;
     }
 
     #[inline]
