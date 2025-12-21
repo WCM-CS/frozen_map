@@ -36,6 +36,14 @@ where
     }
 
     #[inline]
+    pub fn remove_value(&self, idx: usize) {
+        let old_ptr = self.values[idx].swap(std::ptr::null_mut(), Ordering::AcqRel);
+        if !old_ptr.is_null() {
+            unsafe { drop(Box::from_raw(old_ptr)); } //drop old value
+        }
+    }
+
+    #[inline]
     pub fn get_value(&self, idx: usize) -> Option<Arc<V>> {
         let ptr = self.values[idx].load(Ordering::Acquire);
 

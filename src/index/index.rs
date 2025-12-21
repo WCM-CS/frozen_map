@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
+use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit, sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
@@ -61,8 +61,8 @@ pub trait KeyStorage {
 
     fn get(&self, idx: usize) -> &Self::Key;
     fn len(&self) -> usize;
-    fn kill(&mut self, idx: usize);
-    fn rehydrate(&mut self, idx: usize);
+    fn kill(&self, idx: usize);
+    fn rehydrate(&self, idx: usize);
     fn dead_key(&self, idx: usize) -> bool;
 }
 
@@ -71,8 +71,8 @@ pub struct WithKeys<K> {
     #[allow(dead_code)]
     _arena_handle: Bump,
     keys_ptr: *const [K],
-    len: usize,
-    tombstone: BitVec
+    len: AtomicUsize,
+    tombstone: Vec<AtomicBool>
 }
 
 impl<K> WithKeys<K> 
@@ -86,12 +86,14 @@ where
         });
 
         let keys_ptr = arena_keys as *const [K];
-        let tombstone = bitvec![1; keys.len()];
+        let tombstone = (0..keys.len())
+            .map(|_| AtomicBool::new(true))
+            .collect::<Vec<_>>();
 
         Self {
             _arena_handle: arena,
             keys_ptr,
-            len: keys.len(),
+            len: AtomicUsize::new(keys.len()),
             tombstone
         }
     }
@@ -101,16 +103,20 @@ where
 
 pub struct NoKeys<K> {
     _ghost: PhantomData<K>,
-    len: usize,
-    tombstone: BitVec
+    len: AtomicUsize,
+    tombstone: Vec<AtomicBool>
 }
 
 impl<K> NoKeys<K> {
     pub fn new(len: usize) -> Self {
+        let tombstone = (0..len)
+            .map(|_| AtomicBool::new(true))
+            .collect::<Vec<_>>();
+        
         Self {
             _ghost: PhantomData,
-            len,
-            tombstone: bitvec![1; len]
+            len: AtomicUsize::new(len),
+            tombstone
         }
     }
 }
@@ -125,24 +131,26 @@ impl<K> KeyStorage for WithKeys<K> {
 
     #[inline]
     fn len(&self) -> usize {
-        self.len
+        self.len.load(Ordering::Acquire)
     }
 
     #[inline]
-    fn kill(&mut self, idx: usize) {
-        self.tombstone.set(idx, false);
-        self.len -= 1;
+    fn kill(&self, idx: usize) {
+        if self.tombstone[idx].swap(false, Ordering::AcqRel) {
+            self.len.fetch_sub(1, Ordering::AcqRel); // only decrease count if it was dead before
+        }
     }
 
     #[inline]
-    fn rehydrate(&mut self, idx: usize) {
-        self.tombstone.set(idx, true);
-        self.len += 1;
+    fn rehydrate(&self, idx: usize) {
+        if !self.tombstone[idx].swap(true, Ordering::AcqRel) {
+            self.len.fetch_add(1, Ordering::AcqRel);
+        }
     }
 
     #[inline]
     fn dead_key(&self, idx: usize) -> bool {
-        !self.tombstone[idx]
+        !self.tombstone[idx].load(Ordering::Acquire)
     }
 }
 
@@ -156,24 +164,26 @@ impl<K> KeyStorage for NoKeys<K> {
 
     #[inline]
     fn len(&self) -> usize {
-        self.len
+        self.len.load(Ordering::Acquire)
     }
 
     #[inline]
-    fn kill(&mut self, idx: usize) {
-        self.tombstone.set(idx, false);
-        self.len -= 1;
+    fn kill(&self, idx: usize) {
+        if self.tombstone[idx].swap(false, Ordering::AcqRel) {
+            self.len.fetch_sub(1, Ordering::AcqRel); // only decrease count if it was dead before
+        }
     }
 
     #[inline]
-    fn rehydrate(&mut self, idx: usize) {
-        self.tombstone.set(idx, true);
-        self.len += 1;
+    fn rehydrate(&self, idx: usize) {
+        if !self.tombstone[idx].swap(true, Ordering::AcqRel) {
+            self.len.fetch_add(1, Ordering::AcqRel);
+        }
     }
 
     #[inline]
     fn dead_key(&self, idx: usize) -> bool {
-        !self.tombstone[idx]
+        !self.tombstone[idx].load(Ordering::Acquire)
     }
 }
 

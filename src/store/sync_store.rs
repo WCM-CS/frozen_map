@@ -25,10 +25,20 @@ where
     #[inline]
     pub fn update(&mut self, idx: usize, value: V) {
         if self.init[idx] {
-            unsafe { *self.values.inner[idx].assume_init_mut() = value; }
-        } else {
-            self.values.inner[idx].write(value);
-            self.init.set(idx, true);
+            unsafe { std::ptr::drop_in_place(self.values.inner[idx].as_mut_ptr()); }
+        } 
+
+        self.values.inner[idx].write(value);
+        self.init.set(idx, true);
+    }
+
+    #[inline]
+    pub fn remove_value(&mut self, idx: usize) {
+        if self.init[idx] {
+            unsafe {
+                std::ptr::drop_in_place(self.values.inner[idx].as_mut_ptr());
+            }
+            self.init.set(idx, false);
         }
     }
 
