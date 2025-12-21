@@ -11,8 +11,8 @@ pkgs.mkShell {
     (pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
       extensions = [ "rust-src" "rust-analyzer-preview" ];
     }))
-    pkgs.llvmPackages.clang      # <--- add this
-    pkgs.llvmPackages.libcxx  # optional if your crate needs libstdc++
+    pkgs.llvmPackages.clang     
+    pkgs.llvmPackages.libcxx 
   ];
 
   RUSTFLAGS = "-Z unstable-options -C target-cpu=native";

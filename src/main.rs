@@ -1,65 +1,103 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap};
 
-use frozen_map::VerifiedFrozenMap;
+use frozen_map::{AtomicUnverifiedFrozenMap, AtomicVerifiedFrozenMap, SyncUnverifiedFrozenMap, SyncVerifiedFrozenMap};
 
+
+
+
+/*
+ SyncUnverifiedFrozenMap  // lowest overhead //not thread safe // no key verification
+
+ AtomicUnverifiedFrozenMap  // medium overhead // thread safe // no key verification
+
+ SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
+
+ AtomicVerifiedFrozenMap    // highest overhead // thread safe // key verification
+*/
 
 fn main() {
     println!("Hello, world!");
 
-    let keys = vec!["gamma", "alpha", "omega", "Walker"];
+    let keys = vec!["gamma", "alpha", "omega", "delta"];
     let mut values = vec![0, 1, 2, 3];
-
-
-    let mut my_map = HashMap::new();
-
-    for (i, key) in keys.iter().enumerate() {
-        my_map.insert(key, values[i]);
-    }
-
-
-    let answer = my_map.get(&"Walker");
-
-
-
-
-
-
-    let mut jj: VerifiedFrozenMap<&str, u32> = VerifiedFrozenMap::from_vec(keys.clone());
 
 
 
     
+    //SyncUnverifiedFrozenMap  // lowest overhead // not thread safe // no key verification
 
-    for (idx, k) in keys.iter().enumerate() {
-        let value = jj.contains(&keys[idx]);
-        println!("Value: {:?}", value);
-    }
+    // Initialize Map 
+    let mut su: SyncUnverifiedFrozenMap<&str, i32> = SyncUnverifiedFrozenMap::from_vec(keys.clone());
 
-    for (idx, k) in keys.iter().enumerate() {
-        jj.upsert(k, values[idx]);
-        let value = jj.get(k);
-        println!("Value: {:?}", value);
-    }
+    // Load in value
 
-    for (idx, k) in keys.iter().enumerate() {
-        jj.upsert(k, 32);
-        let value = jj.get(k);
-        println!("Value: {:?}", value);
-    }
+    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
+        let res = su.get(key);
+        println!("res: {:?}", res);
 
+        su.upsert(key, *val);
 
-    //values.pop();
-    let new_jj = VerifiedFrozenMap::unsafe_init(keys.clone(), values.clone()).unwrap();
+        let res = su.get(key);
+        println!("res: {:?}", res);
 
-    for (idx, k) in keys.iter().enumerate() {
-        let value = new_jj.get(k);
-        println!("Values: {:?}", value);
-    }
+    });
 
 
 
 
-  //  let r = VerifiedFrozenMap
+    //AtomicUnverifiedFrozenMap  // medium overhead // thread safe // no key verification
+
+    let mut au: AtomicUnverifiedFrozenMap<&str, i32> = AtomicUnverifiedFrozenMap::from_vec(keys.clone());
+
+
+    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
+        let res = au.get(key);
+        println!("res: {:?}", res);
+
+        au.upsert(key, *val);
+
+        let res = au.get(key);
+        println!("res: {:?}", res);
+
+    });
+
+    //SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
+
+    let mut sv: SyncVerifiedFrozenMap<&str, i32> = SyncVerifiedFrozenMap::from_vec(keys.clone());
+
+    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
+        let res = sv.get(key);
+        println!("res: {:?}", res);
+
+        let _ = sv.upsert(key, *val);
+
+        let res = sv.get(key);
+        println!("res: {:?}", res);
+
+    });
+
+    //AtomicVerifiedFrozenMap    // highest overhead // thread safe // key verification
+  
+    let mut au: AtomicVerifiedFrozenMap<&str, i32> = AtomicVerifiedFrozenMap::from_vec(keys.clone());
+
+    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
+        let res = au.get(key);
+        println!("res: {:?}", res);
+
+        au.upsert(key, *val).ok();
+
+        let res = au.get(key);
+        println!("res: {:?}", res);
+
+    });
+
+   
+
+
+
+
+
+
 }
 
 
