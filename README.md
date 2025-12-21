@@ -34,6 +34,8 @@ Important Notes for Memory Management:
 Original goal
 - Build a lightweight static map using a mphf that initializes very fast. 
 
+```markdown
+```rust
 
 // Step One:Prepare values (only keys are needed to build the map)
 let keys: Vec<&str> = vec!["gamma", "alpha", "omega", "delta"];
@@ -99,9 +101,7 @@ assert_eq!(contains_hydrate, true);
 
 assert_eq!(frozen_map.len(), 4);
 
-
-
-
+// -----------------------------------------------------
 // Example for workign with heap allocated keys, where K is a vector of &str
 // collect your starting heap allocated vec of K 
 
