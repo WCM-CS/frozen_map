@@ -1,11 +1,8 @@
 use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
 use ph::{
     BuildDefaultSeededHasher, 
-    phast::{
-        DefaultCompressedArray, Function, Function2, Params, Perfect, SeedChooser, 
-        SeedOnly, ShiftOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
-    }, 
-    seeds::{Bits, Bits8, BitsFast}
+    phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
+    seeds::{BitsFast}
 };
 
 
@@ -78,7 +75,7 @@ impl<K> WithKeys<K> {
 
 pub struct NoKeys<K> {
     _ghost: PhantomData<K>,
-    len: usize
+    pub len: usize
 }
 
 impl<K> NoKeys<K> {

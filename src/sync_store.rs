@@ -1,9 +1,9 @@
-use std::{ mem::MaybeUninit };
+use std::{mem::MaybeUninit};
 use bitvec::{ vec::BitVec };
 
 
 #[repr(C)]
-pub struct Store<V>
+pub struct SyncStore<V>
 where
     V: Send + Sync + Clone + Default,
 {
@@ -11,7 +11,7 @@ where
     init: BitVec,
 }
 
-impl<V> Store<V> 
+impl<V> SyncStore<V> 
 where
     V: Send + Sync + Clone + Default,
 {
@@ -44,7 +44,7 @@ where
     }
 }
 
-impl<V> Drop for Store<V> 
+impl<V> Drop for SyncStore<V> 
 where
     V: Send + Sync + Clone + Default,
 {
@@ -78,4 +78,3 @@ where
         }
     }
 }
-
