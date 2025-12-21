@@ -5,6 +5,7 @@ use ph::{
     seeds::{BitsFast}
 };
 use bumpalo::{Bump};
+use bitvec::{ vec::BitVec, bitvec };
 
 
 type Index = Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, BuildDefaultSeededHasher>;
@@ -45,9 +46,12 @@ where
     #[inline]
     pub fn contains_key(&self, key: &K) -> bool {
         let idx = self.get_index(key);
-        let x = self.keys.get(idx);
 
-        if x == key {
+        if self.keys.dead_key(idx) {
+            return false;
+        } 
+
+        if self.keys.get(idx) == key {
             true
         } else {
             false
@@ -61,12 +65,16 @@ pub trait KeyStorage {
 
     fn get(&self, idx: usize) -> &Self::Key;
     fn len(&self) -> usize;
+    fn delete(&mut self, idx: usize);
+    fn dead_key(&self, idx: usize) -> bool;
 }
 
 pub struct WithKeys<K> {
     #[allow(dead_code)]
     _arena_handle: Bump,
     keys_ptr: *const [K],
+    len: usize,
+    tombstone: BitVec
 }
 
 impl<K> WithKeys<K> 
@@ -80,17 +88,23 @@ where
         });
 
         let keys_ptr = arena_keys as *const [K];
+        let tombstone = bitvec![1; keys.len()];
 
         Self {
             _arena_handle: arena,
             keys_ptr,
+            len: keys.len(),
+            tombstone
         }
     }
 }
 
+// should these be repr c structs?
+
 pub struct NoKeys<K> {
     _ghost: PhantomData<K>,
-    len: usize
+    len: usize,
+    tombstone: BitVec
 }
 
 impl<K> NoKeys<K> {
@@ -98,6 +112,7 @@ impl<K> NoKeys<K> {
         Self {
             _ghost: PhantomData,
             len,
+            tombstone: bitvec![1; len]
         }
     }
 }
@@ -112,7 +127,18 @@ impl<K> KeyStorage for WithKeys<K> {
 
     #[inline]
     fn len(&self) -> usize {
-        unsafe { (&(*self.keys_ptr)).len() }
+        self.len
+    }
+
+    #[inline]
+    fn delete(&mut self, idx: usize) {
+        self.tombstone.set(idx, false);
+        self.len -= 1;
+    }
+
+    #[inline]
+    fn dead_key(&self, idx: usize) -> bool {
+        !self.tombstone[idx]
     }
 }
 
@@ -127,6 +153,17 @@ impl<K> KeyStorage for NoKeys<K> {
     #[inline]
     fn len(&self) -> usize {
         self.len
+    }
+
+    #[inline]
+    fn delete(&mut self, idx: usize) {
+        self.tombstone.set(idx, false);
+        self.len -= 1;
+    }
+
+    #[inline]
+    fn dead_key(&self, idx: usize) -> bool {
+        !self.tombstone[idx]
     }
 }
 

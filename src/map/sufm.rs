@@ -118,14 +118,21 @@ where
     #[inline]
     pub fn get(&self, key: &K) -> Option<&V> {
         let idx = self.index.get_index(key);
+
+        if self.index.keys.dead_key(idx) {
+            return None
+        } 
+
         self.store.get_value(idx)
     }
 
     #[inline]
     pub fn upsert(&mut self, key: K, value: V) {
         let idx = self.index.get_index(&key);
-        self.store.update(idx, value); 
-        // i this replaced an old value return the old value
+        
+        if !self.index.keys.dead_key(idx) {
+            self.store.update(idx, value); 
+        }
     }
 
     #[inline]

@@ -127,8 +127,12 @@ where
     pub fn get(&self, key: &K) -> Option<&V> {
         let idx = self.index.get_index(key);
 
-        if self.index.keys.get(idx)!= key {
-            return None
+        if self.index.keys.dead_key(idx) {
+            return None;
+        }
+
+        if self.index.keys.get(idx) != key {
+            return None;
         }
 
         self.store.get_value(idx)
@@ -142,6 +146,10 @@ where
     #[inline]
     pub fn upsert(&mut self, key: K, value: V) -> Result<(), &str>{
         let idx = self.index.get_index(&key);
+
+        if self.index.keys.dead_key(idx) {
+            return Err("Dead key")
+        }
 
         if self.index.keys.get(idx) == &key {
             self.store.update(idx, value);
