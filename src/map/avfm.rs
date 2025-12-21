@@ -20,7 +20,7 @@ where
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
 {
-    index: VerifiedIndex<K>,
+    index: Arc<VerifiedIndex<K>>,
     store: AtomicStore<V>
 }
 
@@ -75,7 +75,7 @@ where
         let store = AtomicStore::new(keys.len());
         
         Self {
-            index: frozen_index,
+            index: Arc::new(frozen_index),
             store
         }
     }

@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<'a, K> FrozenIndex<WithKeys<K>> 
+impl<K> FrozenIndex<WithKeys<K>> 
 where 
     K: Hash + Eq + Clone + Send + Sync + Default,
 {
