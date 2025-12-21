@@ -8,7 +8,8 @@ use ph::{
     seeds::{BitsFast}
 };
 
-use crate::{KeyStorage, VerifiedIndex, AtomicStore, WithKeys};
+use crate::index::{prelude::*};
+use crate::store::prelude::*;
 
 // AtomicVerifiedFrozenMap   // highest overhead // thread safe // key verification
 
@@ -56,13 +57,19 @@ where
 
         keys.iter().for_each(|key| {
             let idx = index_map.get(&key);
-
             sorted_keys[idx].write(key.clone());
         });
 
+        let slice_keys: Vec<K> = unsafe {
+            sorted_keys
+                .into_iter()
+                .map(|u| u.assume_init())
+                .collect()
+        };
+
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(sorted_keys)
+            keys: WithKeys::new(&slice_keys)
         };
 
         let store = AtomicStore::new(keys.len());

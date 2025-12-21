@@ -10,7 +10,8 @@ use ph::{
 
 use bitvec::bitvec;
 
-use crate::{KeyStorage, UnverifiedIndex, SyncStore, NoKeys};
+use crate::index::{prelude::*};
+use crate::store::prelude::*;
 
 
 // SyncUnverifiedFrozenMap  // lowest overhead //not thread safe // no key verification

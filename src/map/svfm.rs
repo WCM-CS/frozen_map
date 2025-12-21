@@ -9,7 +9,8 @@ use ph::{
 };
 use bitvec::bitvec;
 
-use crate::{KeyStorage, VerifiedIndex, SyncStore, WithKeys};
+use crate::index::{prelude::*};
+use crate::store::prelude::*;
 
 
 //  SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
@@ -67,9 +68,16 @@ where
             init_bloom.set(idx, true);
         });
 
+        let slice_keys: Vec<K> = unsafe {
+            sorted_keys
+                .into_iter()
+                .map(|u| u.assume_init())
+                .collect()
+        };
+
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(sorted_keys)
+            keys: WithKeys::new(&slice_keys)
         };
 
         let store = SyncStore::new(sorted_values, init_bloom);
@@ -109,9 +117,18 @@ where
             sorted_keys[idx].write(key);
         });
 
+        let slice_keys: Vec<K> = unsafe {
+            sorted_keys
+                .into_iter()
+                .map(|u| u.assume_init())
+                .collect()
+        };
+
+        
+
         let frozen_index = VerifiedIndex {
             mphf: index_map,
-            keys: WithKeys::new(sorted_keys)
+            keys: WithKeys::new(&slice_keys)
         };
 
         let store = SyncStore::new(sorted_values, init_bloom);
