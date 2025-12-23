@@ -1,12 +1,12 @@
-use std::{hash::Hash, mem::MaybeUninit, sync::Arc};
+use std::{hash::{BuildHasher, Hash}, mem::MaybeUninit, sync::Arc};
 use ph::{
-    BuildDefaultSeededHasher, 
-    phast::{
-        DefaultCompressedArray, Function2, Params, 
-        ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
-    }, 
-    seeds::{BitsFast}
+    BuildDefaultSeededHasher, BuildSeededHasher, phast::{
+        DefaultCompressedArray, Function2, Params, SeedChooser, SeedOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
+    }, seeds::BitsFast
 };
+//use ph::BuildSeededHasher;       // trait for the builder
+use fasthash::FastHasher;       // trait for the hasher itself
+use std::hash::Hasher;
 
 use crate::index::{prelude::*};
 use crate::store::prelude::*;
@@ -19,7 +19,7 @@ where
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
 {
-    index: Arc<VerifiedIndex<K>>,
+    index: VerifiedIndex<K>,
     store: AtomicStore<V>
 }
 
@@ -33,13 +33,18 @@ where
 
     #[inline]
     pub fn from_vec(keys: Vec<K>) -> Self {
-        let index_map: Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, BuildDefaultSeededHasher> = Function2::with_slice_p_threads_hash_sc(
+     
+        //let hashes: Vec<u64> = keys.iter().map(|k|XXHasher(k)).collect();
+
+        let index_map: Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher> = Function2::with_slice_p_threads_hash_sc(
             &keys, 
             &Params::new(BitsFast(8), bits_per_seed_to_100_bucket_size(8)), 
             std::thread::available_parallelism().map_or(1, |v| v.into()), 
             BuildDefaultSeededHasher::default(), 
-            ShiftOnlyWrapped::<3>
+            ShiftOnlyWrapped::<2>
         );
+
+
 
         //let mut sorted_keys = vec![K::default(); keys.len()]; 
         // note this is expensive to double allocate keys for no good reason aka allocating a default just know the type then we overwrite it which is slow
@@ -67,7 +72,7 @@ where
         let store = AtomicStore::new(keys.len());
         
         Self {
-            index: Arc::new(frozen_index),
+            index: frozen_index,
             store
         }
     }
@@ -122,7 +127,7 @@ where
     }
 
     #[inline]
-    pub fn reap_key(&self, key: &K) -> Result<(), &str> {
+    pub fn reap_key(&mut self, key: &K) -> Result<(), &str> {
 
         let idx = self.index.get_index(&key);
 
@@ -139,7 +144,7 @@ where
     }
 
     #[inline]
-    pub fn rehydrate(&self, key: &K) -> Result<(), &str> {
+    pub fn rehydrate(&mut self, key: &K) -> Result<(), &str> {
 
         let idx = self.index.get_index(&key);
 
@@ -163,4 +168,3 @@ where
     }
 
 }
-

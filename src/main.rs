@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::{collections::HashMap, time::Instant};
 
 use frozen_map::map::{ SyncUnverifiedFrozenMap, SyncVerifiedFrozenMap, AtomicUnverifiedFrozenMap, AtomicVerifiedFrozenMap };
 
@@ -15,205 +15,99 @@ use frozen_map::map::{ SyncUnverifiedFrozenMap, SyncVerifiedFrozenMap, AtomicUnv
 
 fn main() {
 
+    // phast hash functio  by itself 100k keys = 80 seconds
+
+    
     // Step One:Prepare values (only keys are needed to build the map)
-    let keys: Vec<&str> = vec!["gamma", "alpha", "omega", "delta"];
+    //let keys: Vec<&str> = vec!["gamma", "alpha", "omega", "delta"];
+
+    let start = Instant::now();
 
     // Step 2: Build the FrozenMap you selected, here I'm using the Atomic Verified version. They all habe the same build api, some maps have more methods than others though.
-    let frozen_map: AtomicVerifiedFrozenMap<&str, u32> = AtomicVerifiedFrozenMap::from_vec(keys);
+    //let frozen_map: AtomicVerifiedFrozenMap<&str, u32> = AtomicVerifiedFrozenMap::from_vec(keys);
 
-    // step 3: Now your map is built, you can load in the keys and query it as needed
-    
-    // Upsert a value:
-    // note for the atomic version this can return error so you should unwrap with caution since if you passed in a invalid key it will panic, 
-    // while the unverified version would return an invalid response for a invalid key and not panic
-    frozen_map.upsert( "gamma", 99).ok(); 
-
-    // Access the value based on the key, will return none if key does not exist or if the key is dead
-    if let Some(val) = frozen_map.get(&"gamma") {
-        println!("value: {:?}", val); // assert it is 99
-        assert_eq!(99, *val);
-    }
-
-    // update / ovwerite the value
-    frozen_map.upsert( "gamma", 1).ok();
-
-    if let Some(val) = frozen_map.get(&"gamma") {
-        println!("new value: {:?}", val);
-        assert_eq!(1, *val);
-    }
-
-    // drop the value
-    let r = frozen_map.drop_value(&"gamma");
-    println!("Dropping the value: {:?}", r);
-    //assert_error
-
-    let null_res = frozen_map.get(&"gamma");
-    println!("value get request: {:?}", null_res);
-
-
-
-
-    frozen_map.upsert( "gamma", 1).ok();
-    let null_res = frozen_map.get(&"gamma");
-    println!("before key killing: {:?}", null_res);
-
-
-    // kill the key 
-    // Note reaping keys adds a bit to thier tombstone but this does not delete their correlating value
-    // the value it will be unaccessible if the key is dead, you can drop the value for that key if you want 
-    let reap_res = frozen_map.reap_key(&"gamma");
-
-    let null_res = frozen_map.get(&"gamma");
-    println!("after key killing: {:?}", null_res);
-
-
-    // contains:: method exists for verified maps only
-    let contains_true = frozen_map.contains(&"delta");
-    let contains_false = frozen_map.contains(&"gamma");
-    assert_eq!(contains_true, true);
-    assert_eq!(contains_false, false);
-
-    let hydrate_res = frozen_map.rehydrate(&"gamma");
-    let contains_hydrate = frozen_map.contains(&"gamma");
-    assert_eq!(contains_hydrate, true);
-
-    assert_eq!(frozen_map.len(), 4);
-
+    let n = 100_000_000;
+    //let mut key_vec = vec![];
+      let mut key_storage: Vec<Vec<u8>> = Vec::with_capacity(n);
    
 
+    // 100 Million String keys in the map no values 
 
-    // Example for workign with heap allocated keys, where K is a vector of &str
-    // collect your starting heap allocated vec of K 
-
-    let keys_heap = vec![vec!["green", "blue", "red"], vec!["yellow", "purple"], vec!["orange"]];
+    // Atomic verified 
+    // 19.2 seconds to build
+    // 12.2gb max then 9.8gb after build is completed
     
-    //  function for encoding a vec, or use bincode or other
-    fn encode_vec(v: &[&str]) -> Vec<u8> {
-        let mut out = Vec::new();
-        for s in v {
-            let bytes = s.as_bytes();
-            let len = bytes.len() as u32;
-            out.extend_from_slice(&len.to_le_bytes());
-            out.extend_from_slice(bytes);
-        }
-        out
+    // sync verified
+    // 12.4 seconds
+    // 8.2 for max build, 5.8gb final
+
+//-------------------------------//
+
+    // atomic unverified 
+    // 6.45 seconds to build
+    // 6.4, 4.2 gb final
+
+
+    // sync unverified
+    // 6.5 seconds
+    // 6.6gb max, 3.4gb final build
+
+
+
+
+
+    // 100 Million integer keys in the map no values 
+
+    // Atomic verified 
+    // 4.31 seconds to build
+    // 1.5gb max then 1.3gb after build is completed
+    
+    // sync verified
+    // 3.67 seconds
+    // 1.4gb for max build, 470mb final
+
+//-------------------------------//
+
+    // atomic unverified 
+    // 2.08 seconds to build
+    // 1.3gb max, 860mb final
+
+
+    // sync unverified
+    // 1.72 seconds
+    // 1.4gb max, 70mb final build
+
+
+
+    println!("Getting keys ready");
+    for i in 0..n {
+        let bytes = i.to_string().into_bytes();
+        key_storage.push(bytes);
     }
+    let key_slices: Vec<&[u8]> = key_storage.iter().map(|v| v.as_slice()).collect();
 
+// key slices can be created temporarily when needed
+    //let key_slices: Vec<&[u8]> = key_storage.iter().map(|v| v.as_slice()).collect();
 
-    // Serialize each Vec<&str> to Vec<u8> using bincode
-    let serialized_keys: Vec<Vec<u8>> = keys_heap
-        .iter()
-        .map(|v| encode_vec(&v[..]))
-        .collect();
-
-    // Convert to slices to pass into SyncUnverifiedFrozenMap
-    let key_refs: Vec<&[u8]> = serialized_keys.iter().map(|v| v.as_slice()).collect();
-
-    let mut frozen_map2: SyncUnverifiedFrozenMap<&[u8], u32> = SyncUnverifiedFrozenMap::from_vec(key_refs.clone());
-
-    let new_vals = [32, 33, 34];
-
-    for (i, k) in key_refs.iter().enumerate() {
-        frozen_map2.upsert(k, new_vals[i]);
-        let res = frozen_map2.get(k);
-        println!("{:?}", res);
-        assert_eq!(*res.unwrap(), new_vals[i]);
-    }
-
-
-
-
-
-
-    /*
-        //SyncUnverifiedFrozenMap  // lowest overhead // not thread safe // no key verification
-
-    // Initialize Map 
-    let mut su: SyncUnverifiedFrozenMap<&str, i32> = SyncUnverifiedFrozenMap::from_vec(keys.clone());
-
-    // Load in value
-
-    keys.iter().zip(values.iter()).for_each(|(key, val)| {
-        let res = su.get(key);
-        println!("res: {:?}", res);
-
-        su.upsert(key, *val);
-
-        let res = su.get(key);
-        println!("res: {:?}", res);
-
-    });
-
-
-
-
-    //AtomicUnverifiedFrozenMap  // medium overhead // thread safe // no key verification
-
-    let mut au: AtomicUnverifiedFrozenMap<&str, i32> = AtomicUnverifiedFrozenMap::from_vec(keys.clone());
-
-
-    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
-        let res = au.get(key);
-        println!("res: {:?}", res);
-
-        au.upsert(key, *val);
-
-        let res = au.get(key);
-        println!("res: {:?}", res);
-
-    });
-
-    //SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
-
-    let mut sv: SyncVerifiedFrozenMap<&str, i32> = SyncVerifiedFrozenMap::from_vec(keys.clone());
-
-    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
-        let res = sv.get(key);
-        println!("res: {:?}", res);
-
-        let _ = sv.upsert(key, *val);
-
-        let res = sv.get(key);
-        println!("res: {:?}", res);
-
-    });
-
-
-    //AtomicVerifiedFrozenMap    // highest overhead // thread safe // key verification
-  
-    let mut au: AtomicVerifiedFrozenMap<&str, i32> = AtomicVerifiedFrozenMap::from_vec(keys.clone());
-
-    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
-        let res = au.get(key);
-        println!("res: {:?}", res);
-
-        au.upsert(key, *val).ok();
-
-        let res = au.get(key);
-        println!("res: {:?}", res);
-
-    });
-
-
-
-     //let mut au: AtomicVerifiedFrozenMap<&str, i32> = AtomicVerifiedFrozenMap::from_vec(keys.clone());
-
-    keys.iter().zip(values.iter().enumerate()).for_each(|(key, (idx, val))| {
-        let res = au.get(&"delta");
-        println!("res: {:?}", res);
-
-       // au.upsert(key, 55).ok();
-
-        //let res = au.get(key);
-        //println!("res: {:?}", res);
-
-    });
-   
-    
-     */
+    println!("Building map");
+    let mut frozen_map: SyncVerifiedFrozenMap<&[u8], u32> = SyncVerifiedFrozenMap::from_vec(key_slices);
 
     
+    let end = start.elapsed();
+    println!("Time to build frozen map with 100M keys: {:?}", end);
+
+    frozen_map.upsert("378".as_bytes(), 1);
+
+    let y = frozen_map.get(&"378".as_bytes()).unwrap();
+    println!("{}", y);
+
+   // std::thread::sleep(std::time::Duration::from_secs(12));
+
     
+
+
+
+
 
     
 

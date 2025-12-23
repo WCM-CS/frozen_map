@@ -25,7 +25,9 @@ where
     #[inline]
     pub fn update(&mut self, idx: usize, value: V) {
         if self.init[idx] {
-            unsafe { std::ptr::drop_in_place(self.values.inner[idx].as_mut_ptr()); }
+            unsafe { 
+                std::ptr::drop_in_place(self.values.inner[idx].as_mut_ptr()); 
+            }
         } 
 
         self.values.inner[idx].write(value);

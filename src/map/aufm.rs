@@ -2,10 +2,9 @@ use std::{hash::Hash, mem::MaybeUninit, sync::Arc};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{
-        DefaultCompressedArray, Function2, Params,
-        ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
+        DefaultCompressedArray, Function2, Params, SeedOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
     }, 
-    seeds::{BitsFast}
+    seeds::BitsFast
 };
 
 use crate::index::{prelude::*};
@@ -22,7 +21,7 @@ where
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default,
 {
-    index: Arc<UnverifiedIndex<K>>,
+    index: UnverifiedIndex<K>,
     store: AtomicStore<V>
 }
 
@@ -34,12 +33,12 @@ where
 {
     #[inline]
     pub fn from_vec(keys: Vec<K> ) -> Self {
-        let index_map: Function2<BitsFast, ShiftOnlyWrapped::<3>, DefaultCompressedArray, BuildDefaultSeededHasher> = Function2::with_slice_p_threads_hash_sc(
+        let index_map: Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher> = Function2::with_slice_p_threads_hash_sc(
             &keys, 
             &Params::new(BitsFast(8), bits_per_seed_to_100_bucket_size(8)), 
             std::thread::available_parallelism().map_or(1, |v| v.into()), 
             BuildDefaultSeededHasher::default(), 
-            ShiftOnlyWrapped::<3>
+            ShiftOnlyWrapped::<2>
         );
 
         //let mut sorted_keys = vec![K::default(); keys.len()]; 
@@ -66,7 +65,7 @@ where
    //     let jj = Value
 
         Self {
-            index: Arc::new(frozen_index),
+            index: frozen_index,
             store: store
         }
     }
@@ -102,7 +101,7 @@ where
     }
 
     #[inline]
-    pub fn reap_key(&self, key: &K) -> Result<(), &str> {
+    pub fn reap_key(&mut self, key: &K) -> Result<(), &str> {
 
         let idx = self.index.get_index(&key);
 

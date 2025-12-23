@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ahash = "0.8.12"
 bitvec = "1.0.1"
 bumpalo = { version = "3.19.1", features = ["boxed"] }
+fasthash = "0.4.0"
 ph = {version = "0.10.0", features = ["gxhash", "sux"] }
