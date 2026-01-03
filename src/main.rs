@@ -1,118 +1,78 @@
 use std::{collections::HashMap, time::Instant};
+use rand::distr::Map;
 
-use frozen_map::map::{ SyncUnverifiedFrozenMap, SyncVerifiedFrozenMap, AtomicUnverifiedFrozenMap, AtomicVerifiedFrozenMap };
+
+use frozen_map::map::FrozenMap;
+use frozen_map::map::UnsafeFrozenMap;
 
 
-/*
- SyncUnverifiedFrozenMap  // lowest overhead //not thread safe // no key verification
-
- AtomicUnverifiedFrozenMap  // medium overhead // thread safe // no key verification
-
- SyncVerifiedFrozenMap    // higher overhead // not thread safe // key verification
-
- AtomicVerifiedFrozenMap    // highest overhead // thread safe // key verification
-*/
 
 fn main() {
 
-    // phast hash functio  by itself 100k keys = 80 seconds
 
-    
-    // Step One:Prepare values (only keys are needed to build the map)
-    //let keys: Vec<&str> = vec!["gamma", "alpha", "omega", "delta"];
+    // std::thread::sleep(std::time::Duration::from_secs(12));
 
-    let start = Instant::now();
+    let keys = vec![
+    "gamma",
+    "delta",
+    "void",
+    "bump"
+    ];
 
-    // Step 2: Build the FrozenMap you selected, here I'm using the Atomic Verified version. They all habe the same build api, some maps have more methods than others though.
-    //let frozen_map: AtomicVerifiedFrozenMap<&str, u32> = AtomicVerifiedFrozenMap::from_vec(keys);
+    // from_vec ~ Initialized
 
-    let n = 100_000_000;
-    //let mut key_vec = vec![];
-      let mut key_storage: Vec<Vec<u8>> = Vec::with_capacity(n);
-   
-
-    // 100 Million String keys in the map no values 
-
-    // Atomic verified 
-    // 19.2 seconds to build
-    // 12.2gb max then 9.8gb after build is completed
-    
-    // sync verified
-    // 12.4 seconds
-    // 8.2 for max build, 5.8gb final
-
-//-------------------------------//
-
-    // atomic unverified 
-    // 6.45 seconds to build
-    // 6.4, 4.2 gb final
+    let mut frozen_map: FrozenMap<&str, usize> = FrozenMap::from_vec(keys.clone());
 
 
-    // sync unverified
-    // 6.5 seconds
-    // 6.6gb max, 3.4gb final build
+    // upsert(k, v) ~ replace value if the key exists adn is not reaped
+    let _ = frozen_map.upsert(&"gamma", 0);
+    let _ = frozen_map.upsert(&"delta", 1);
+    let _ = frozen_map.upsert(&"void", 2);
+    let _ = frozen_map.upsert(&"bump", 3);
 
 
+    // get(k) ~ Retreive V if it exists
+    let k = frozen_map.get(&"gamma").unwrap();
+    println!("{}", k);
+    assert_eq!(*k, 0);
 
 
-
-    // 100 Million integer keys in the map no values 
-
-    // Atomic verified 
-    // 4.31 seconds to build
-    // 1.5gb max then 1.3gb after build is completed
-    
-    // sync verified
-    // 3.67 seconds
-    // 1.4gb for max build, 470mb final
-
-//-------------------------------//
-
-    // atomic unverified 
-    // 2.08 seconds to build
-    // 1.3gb max, 860mb final
+    // contains(k) ~ check if the key exists and is not reaped
+    assert_eq!(frozen_map.contains(&"gamma"), true);
 
 
-    // sync unverified
-    // 1.72 seconds
-    // 1.4gb max, 70mb final build
+    // drop_value(k) ~ drop the value per a given key
+    let _ = frozen_map.drop_value(&"gamma");
+
+    let k = frozen_map.get(&"gamma");
+    println!("{:?}", k);
+
+    let _ = frozen_map.upsert(&"gamma", 4);
+
+    let k = frozen_map.get(&"gamma");
+    println!("{:?}", k);
 
 
+    // reap_key(k) ~ reap the key (logical deletion)
+    let _ = frozen_map.reap_key(&"gamma");
 
-    println!("Getting keys ready");
-    for i in 0..n {
-        let bytes = i.to_string().into_bytes();
-        key_storage.push(bytes);
-    }
-    let key_slices: Vec<&[u8]> = key_storage.iter().map(|v| v.as_slice()).collect();
-
-// key slices can be created temporarily when needed
-    //let key_slices: Vec<&[u8]> = key_storage.iter().map(|v| v.as_slice()).collect();
-
-    println!("Building map");
-    let mut frozen_map: SyncVerifiedFrozenMap<&[u8], u32> = SyncVerifiedFrozenMap::from_vec(key_slices);
-
-    
-    let end = start.elapsed();
-    println!("Time to build frozen map with 100M keys: {:?}", end);
-
-    frozen_map.upsert("378".as_bytes(), 1);
-
-    let y = frozen_map.get(&"378".as_bytes()).unwrap();
-    println!("{}", y);
-
-   // std::thread::sleep(std::time::Duration::from_secs(12));
-
-    
+    let k = frozen_map.get(&"gamma");
+    println!("{:?}", k);
 
 
+    // rehydrate_key(k) ~ rehydrate key (logical append)
+    let _ = frozen_map.rehydrate_key(&"gamma");
+
+    let k = frozen_map.get(&"gamma");
+    println!("{:?}", k);
 
 
+     let _ = frozen_map.drop_value(&"gamma");
 
-    
-
-
-
+    // iter() ~ iterate over the keys and values
+    frozen_map.iter().for_each(|(k, v)| {
+        println!("Key: {k}, Value: {v}");
+    });
 
 
 

@@ -1,14 +1,14 @@
-use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit, sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
+use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit, };
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{DefaultCompressedArray, Function2, SeedOnly, ShiftOnlyWrapped}, 
     seeds::BitsFast
 };
-use bumpalo::{Bump};
+
 use bitvec::{ vec::BitVec, bitvec };
 
 
-type Index = Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher>;
+type MPHF = Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher>;
 
 pub type VerifiedIndex<K> = FrozenIndex<WithKeys<K>>;
 pub type UnverifiedIndex<K> = FrozenIndex<NoKeys<K>>;
@@ -19,7 +19,7 @@ where
     S: KeyStorage,
     S::Key: Hash + Eq + Clone + Send + Sync + Default,
 {
-    pub mphf: Index,
+    pub mphf: MPHF,
     pub keys: S
 }
 
@@ -68,9 +68,7 @@ pub trait KeyStorage {
 
 
 pub struct WithKeys<K> {
-    #[allow(dead_code)]
-    _arena_handle: Bump,
-    keys_ptr: *const [K],
+    keys: Box<[K]>,
     len: usize,
     tombstone: BitVec
 }
@@ -80,20 +78,25 @@ where
     K: Hash + Eq + Send + Sync + Clone + Default,
 {
     pub fn new_from_uninit(keys: Vec<MaybeUninit<K>>) -> Self {
-        let arena = Bump::new();
-        let arena_keys: &mut [K] = arena.alloc_slice_fill_with(keys.len(), |i| unsafe {
-            keys[i].assume_init_read() // moves the value out of MaybeUninit
-        });
+        let n = keys.len();
 
-        let keys_ptr = arena_keys as *const [K];
-        let tombstone = bitvec![0; keys.len()];
+        let keys_k: Box<[K]> = keys // fixed size heap alloc for keys 
+            .into_iter()
+            .map(|maybe| unsafe { maybe.assume_init() })
+            .collect::<Vec<K>>()
+            .into_boxed_slice();
+
+        let tombstone = bitvec![0; n];
 
         Self {
-            _arena_handle: arena,
-            keys_ptr,
-            len: keys.len(),
+            keys: keys_k,
+            len: n,
             tombstone
         }
+    }
+
+    pub fn get_keys(&self) -> Vec<K> {
+        self.keys.to_vec()
     }
 }
 
@@ -120,9 +123,11 @@ impl<K> NoKeys<K> {
 impl<K> KeyStorage for WithKeys<K> {
     type Key = K;
 
+
+    
     #[inline]
     fn get(&self, idx: usize) -> &K {
-        unsafe { &(*self.keys_ptr)[idx] }
+        &self.keys[idx]
     }
 
     #[inline]

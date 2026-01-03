@@ -16,17 +16,17 @@ use crate::store::prelude::*;
 // SyncUnverifiedFrozenMap  // lowest overhead //not thread safe // no key verification
 
 
-pub struct SyncUnverifiedFrozenMap<K, V> 
+pub struct UnsafeFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
 {
     index: UnverifiedIndex<K>,
-    store: SyncStore<V>
+    store: Store<V>
 }
 
 
-impl<K, V> SyncUnverifiedFrozenMap<K, V> 
+impl<K, V> UnsafeFrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
@@ -37,7 +37,7 @@ where
     pub fn from_vec(keys: Vec<K>) -> Self {
         let index_map: Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher> = Function2::with_slice_p_threads_hash_sc(
             &keys, 
-            &Params::new(BitsFast(8), bits_per_seed_to_100_bucket_size(8)), 
+            &Params::new(BitsFast(10), bits_per_seed_to_100_bucket_size(8)), 
             std::thread::available_parallelism().map_or(1, |v| v.into()), 
             BuildDefaultSeededHasher::default(), 
             ShiftOnlyWrapped::<2>
@@ -62,7 +62,7 @@ where
             keys: NoKeys::new(keys.len())
         };
 
-        let store = SyncStore::new(sorted_values, init_bloom);
+        let store = Store::new(sorted_values, init_bloom);
 
         Self {
             index: frozen_index,
@@ -109,6 +109,17 @@ where
         Ok(())
     }
 
+    #[inline]
+    pub fn rehydrate_key(&mut self, key: &K) -> Result<(), &str> {
+        let idx = self.index.get_index(&key);
+
+        if !self.index.keys.dead_key(idx) {
+            return Err("Key is already alive")
+        }
+
+        self.index.keys.rehydrate(idx);
+        Ok(())
+    }
 
 
     #[inline]

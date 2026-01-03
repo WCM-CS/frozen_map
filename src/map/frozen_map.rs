@@ -1,50 +1,47 @@
-use std::{hash::{BuildHasher, Hash}, mem::MaybeUninit, sync::Arc};
+use std::{hash::Hash, mem::MaybeUninit};
 use ph::{
-    BuildDefaultSeededHasher, BuildSeededHasher, phast::{
-        DefaultCompressedArray, Function2, Params, SeedChooser, SeedOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
-    }, seeds::BitsFast
+    BuildDefaultSeededHasher, 
+    phast::{
+        DefaultCompressedArray, Function2, Params, SeedOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
+    }, 
+    seeds::BitsFast
 };
-//use ph::BuildSeededHasher;       // trait for the builder
-use fasthash::FastHasher;       // trait for the hasher itself
-use std::hash::Hasher;
+use bitvec::bitvec;
 
 use crate::index::{prelude::*};
 use crate::store::prelude::*;
 
-// AtomicVerifiedFrozenMap   // highest overhead // thread safe // key verification
 
+//  SyncVerifiedFrozenMap    // higher overhead // no thread safe // key verification
 
-pub struct AtomicVerifiedFrozenMap<K, V> 
+pub struct FrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
 {
     index: VerifiedIndex<K>,
-    store: AtomicStore<V>
+    store: Store<V>
 }
 
 
+
 // only use if the key value pair indexes line up properly
-impl<K, V> AtomicVerifiedFrozenMap<K, V> 
+impl<K, V> FrozenMap<K, V> 
 where 
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default
 {
 
-    #[inline]
-    pub fn from_vec(keys: Vec<K>) -> Self {
-     
-        //let hashes: Vec<u64> = keys.iter().map(|k|XXHasher(k)).collect();
 
+    #[inline]// encode the keys outside of this call idealy
+    pub fn from_vec(keys: Vec<K>) -> Self {
         let index_map: Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher> = Function2::with_slice_p_threads_hash_sc(
             &keys, 
-            &Params::new(BitsFast(8), bits_per_seed_to_100_bucket_size(8)), 
+            &Params::new(BitsFast(10), bits_per_seed_to_100_bucket_size(8)), 
             std::thread::available_parallelism().map_or(1, |v| v.into()), 
             BuildDefaultSeededHasher::default(), 
             ShiftOnlyWrapped::<2>
         );
-
-
 
         //let mut sorted_keys = vec![K::default(); keys.len()]; 
         // note this is expensive to double allocate keys for no good reason aka allocating a default just know the type then we overwrite it which is slow
@@ -57,11 +54,12 @@ where
         let mut sorted_values: Vec<MaybeUninit<V>> = Vec::with_capacity(keys.len()); // allocated memory for n elemens
         unsafe { sorted_values.set_len(keys.len()); } // changes the actual length of the vec to n length without any overhead
 
-       // let init_bloom = bitvec![0; keys.len()];
+        let init_bloom = bitvec![0; keys.len()];
 
-        keys.iter().for_each(|key| {
+        keys.into_iter().for_each(|key| {
             let idx = index_map.get(&key);
-            sorted_keys[idx].write(key.clone());
+
+            sorted_keys[idx].write(key);
         });
 
         let frozen_index = VerifiedIndex {
@@ -69,7 +67,7 @@ where
             keys: WithKeys::new_from_uninit(sorted_keys)
         };
 
-        let store = AtomicStore::new(keys.len());
+        let store = Store::new(sorted_values, init_bloom);
         
         Self {
             index: frozen_index,
@@ -77,8 +75,9 @@ where
         }
     }
 
+    
     #[inline]
-    pub fn get(&self, key: &K) -> Option<Arc<V>> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         let idx = self.index.get_index(key);
 
         if self.index.keys.dead_key(idx) {
@@ -98,7 +97,7 @@ where
     }
 
     #[inline]
-    pub fn upsert(&self, key: K, value: V) -> Result<(), &str> {
+    pub fn upsert(&mut self, key: K, value: V) -> Result<(), &str>{
         let idx = self.index.get_index(&key);
 
         if self.index.keys.dead_key(idx) {
@@ -107,15 +106,14 @@ where
 
         if self.index.keys.get(idx) == &key {
             self.store.update(idx, value);
-            return Ok(())
+            Ok(())
         } else {
-            return Err("Failed to upsert, key does not exist")
+            Err("Failed to upsert, key does not exist")
         }
     }
 
-    // delete the value
     #[inline]
-    pub fn drop_value(&self, key: &K) -> Result<(), &str> {
+    pub fn drop_value(&mut self, key: &K) -> Result<(), &str> {
         let idx = self.index.get_index(&key);
 
         if self.index.keys.get(idx) == key {
@@ -128,7 +126,6 @@ where
 
     #[inline]
     pub fn reap_key(&mut self, key: &K) -> Result<(), &str> {
-
         let idx = self.index.get_index(&key);
 
         if self.index.keys.dead_key(idx) {
@@ -144,8 +141,7 @@ where
     }
 
     #[inline]
-    pub fn rehydrate(&mut self, key: &K) -> Result<(), &str> {
-
+    pub fn rehydrate_key(&mut self, key: &K) -> Result<(), &str> {
         let idx = self.index.get_index(&key);
 
         if !self.index.keys.dead_key(idx) {
@@ -161,10 +157,14 @@ where
     }
 
 
-
     #[inline]
     pub fn len(&self) -> usize {
         self.index.keys.len()
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (K, V)> {
+        self.index.keys.get_keys().into_iter().zip(self.store.get_values().into_iter()).filter_map(|(k, v)| v.map(|v| (k, v)))
     }
 
 }

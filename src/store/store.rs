@@ -2,7 +2,7 @@ use std::{mem::MaybeUninit};
 use bitvec::{ vec::BitVec };
 
 
-pub struct SyncStore<V>
+pub struct Store<V>
 where
     V: Send + Sync + Clone + Default,
 {
@@ -10,7 +10,7 @@ where
     init: BitVec,
 }
 
-impl<V> SyncStore<V> 
+impl<V> Store<V> 
 where
     V: Send + Sync + Clone + Default,
 {
@@ -53,9 +53,18 @@ where
             None
         }
     }
+
+    #[inline]
+    pub fn get_values(&self) -> Vec<Option<V>> {
+       self.values.inner.iter().enumerate().map(|(i, v)| {
+            self.init[i].then(|| unsafe { v.assume_init_ref().clone() })
+       })
+       .collect()
+
+    }
 }
 
-impl<V> Drop for SyncStore<V> 
+impl<V> Drop for Store<V> 
 where
     V: Send + Sync + Clone + Default,
 {
