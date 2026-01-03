@@ -1,5 +1,7 @@
 Frozen-Key HashMap
 
+Read optimized static key hashmap.
+
 Build Features 
 - SoA (struct of Array) memory layout for cache locality optimizations. 
 - Map uses PHast+ hashing for the mphf index, created by: https://arxiv.org/pdf/2504.17918
@@ -7,7 +9,11 @@ Build Features
 Usage Features
 - Keys are static but you can label keys as dead via a tombstone and also revive them.
 - Values are dynamic and can be mutated or dropped during runtime.
-- Key verification & concurrency support is optional.
+- Key verification is optional
+
+Versions
+- FrozenMap ~ Stores keys for key verification on each request. This includes more features than unsafe version such as a k-v pair iterator and a contains method.
+- UnsafeFrozenMap ~ Does not store keys internally which saves space by only storing keys within the MPHF index, therefore, any key used to mutate or access the map must be a member of the initial valid set used to build the frozen map or else you will experience undefined behavior.
 
 ```markdown
 ```rust
