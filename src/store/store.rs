@@ -2,7 +2,7 @@ use std::{mem::MaybeUninit};
 use bitvec::{ vec::BitVec };
 
 
-pub struct SyncStore<V>
+pub struct Store<V>
 where
     V: Send + Sync + Clone + Default,
 {
@@ -10,7 +10,7 @@ where
     init: BitVec,
 }
 
-impl<V> SyncStore<V> 
+impl<V> Store<V> 
 where
     V: Send + Sync + Clone + Default,
 {
@@ -25,7 +25,9 @@ where
     #[inline]
     pub fn update(&mut self, idx: usize, value: V) {
         if self.init[idx] {
-            unsafe { std::ptr::drop_in_place(self.values.inner[idx].as_mut_ptr()); }
+            unsafe { 
+                std::ptr::drop_in_place(self.values.inner[idx].as_mut_ptr()); 
+            }
         } 
 
         self.values.inner[idx].write(value);
@@ -51,9 +53,18 @@ where
             None
         }
     }
+
+    #[inline]
+    pub fn get_values(&self) -> Vec<Option<V>> {
+       self.values.inner.iter().enumerate().map(|(i, v)| {
+            self.init[i].then(|| unsafe { v.assume_init_ref().clone() })
+       })
+       .collect()
+
+    }
 }
 
-impl<V> Drop for SyncStore<V> 
+impl<V> Drop for Store<V> 
 where
     V: Send + Sync + Clone + Default,
 {

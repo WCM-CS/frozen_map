@@ -535,8 +535,9 @@ name = "frozen_map"
 version = "0.1.0"
 dependencies = [
  "bitvec",
- "bumpalo",
  "ph",
+ "rand",
+ "xxhash-rust",
 ]
 
 [[package]]
