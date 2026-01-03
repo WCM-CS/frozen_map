@@ -2,7 +2,7 @@ use std::{hash::Hash, mem::MaybeUninit};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{
-        DefaultCompressedArray, Function2, Params, SeedOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
+        DefaultCompressedArray, Function2, Params, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
     }, 
     seeds::BitsFast
 };

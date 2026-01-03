@@ -536,8 +536,6 @@ version = "0.1.0"
 dependencies = [
  "bitvec",
  "ph",
- "rand",
- "xxhash-rust",
 ]
 
 [[package]]

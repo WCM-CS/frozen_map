@@ -1,1 +1,6 @@
 /target
+
+
+*.lock
+*.json
+*.csv

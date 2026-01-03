@@ -1,9 +1,5 @@
-use std::{collections::HashMap, time::Instant};
-use rand::distr::Map;
-
 
 use frozen_map::map::FrozenMap;
-use frozen_map::map::UnsafeFrozenMap;
 
 
 
@@ -44,13 +40,21 @@ fn main() {
     // drop_value(k) ~ drop the value per a given key
     let _ = frozen_map.drop_value(&"gamma");
 
+    // contains_value(k) ~ check if the value is initialized
+    assert_eq!(frozen_map.contains_value(&"gamma"), false);
+
     let k = frozen_map.get(&"gamma");
     println!("{:?}", k);
+    assert_eq!(k, None);
+
+
 
     let _ = frozen_map.upsert(&"gamma", 4);
 
     let k = frozen_map.get(&"gamma");
     println!("{:?}", k);
+    assert_eq!(*k.unwrap(), 4);
+
 
 
     // reap_key(k) ~ reap the key (logical deletion)
@@ -58,6 +62,7 @@ fn main() {
 
     let k = frozen_map.get(&"gamma");
     println!("{:?}", k);
+    assert_eq!(k, None);
 
 
     // rehydrate_key(k) ~ rehydrate key (logical append)
@@ -65,14 +70,19 @@ fn main() {
 
     let k = frozen_map.get(&"gamma");
     println!("{:?}", k);
+    assert_eq!(*k.unwrap(), 4);
 
 
-     let _ = frozen_map.drop_value(&"gamma");
-
-    // iter() ~ iterate over the keys and values
+    // iter() ~ iterate over the keys and value pairs, this will exclude unititialized values
     frozen_map.iter().for_each(|(k, v)| {
         println!("Key: {k}, Value: {v}");
     });
+
+    // iter_keys() ~ iterate over all the keys even if they are reaped
+    frozen_map.iter_keys().for_each(|k| {
+        println!("Key: {k}");
+    });
+
 
 
 

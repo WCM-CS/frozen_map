@@ -2,7 +2,7 @@ use std::{hash::Hash, mem::MaybeUninit};
 use ph::{
     BuildDefaultSeededHasher, 
     phast::{
-        DefaultCompressedArray, Function2, Params, SeedOnly, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
+        DefaultCompressedArray, Function2, Params, ShiftOnlyWrapped, bits_per_seed_to_100_bucket_size
     }, 
     seeds::BitsFast
 };
@@ -97,6 +97,16 @@ where
     }
 
     #[inline]
+    pub fn contains_value(&self, key: &K) -> bool {
+        let idx = self.index.get_index(key);
+        if self.store.get_value(idx).is_none() {
+           false 
+        } else {
+            true
+        }
+    }
+
+    #[inline]
     pub fn upsert(&mut self, key: K, value: V) -> Result<(), &str>{
         let idx = self.index.get_index(&key);
 
@@ -165,6 +175,11 @@ where
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> {
         self.index.keys.get_keys().into_iter().zip(self.store.get_values().into_iter()).filter_map(|(k, v)| v.map(|v| (k, v)))
+    }
+
+    #[inline]
+    pub fn iter_keys(&self) -> impl Iterator<Item = K> {
+        self.index.keys.get_keys().into_iter()
     }
 
 }

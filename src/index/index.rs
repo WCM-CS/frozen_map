@@ -1,7 +1,7 @@
 use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit, };
 use ph::{
     BuildDefaultSeededHasher, 
-    phast::{DefaultCompressedArray, Function2, SeedOnly, ShiftOnlyWrapped}, 
+    phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
     seeds::BitsFast
 };
 
