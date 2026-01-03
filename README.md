@@ -12,6 +12,9 @@ Usage Features
 ```markdown
 ```rust
 
+use frozen_map::map::FrozenMap;
+// or use frozen_map::map::UnsafeFrozenMap;
+
 let keys = vec![
 "gamma",
 "delta",

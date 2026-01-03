@@ -1,3 +1,3 @@
 pub mod index;
-pub mod store;
 pub mod map;
+pub mod store;

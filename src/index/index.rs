@@ -1,26 +1,25 @@
-use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit, };
 use ph::{
-    BuildDefaultSeededHasher, 
-    phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped}, 
-    seeds::BitsFast
+    BuildDefaultSeededHasher,
+    phast::{DefaultCompressedArray, Function2, ShiftOnlyWrapped},
+    seeds::BitsFast,
 };
+use std::{hash::Hash, marker::PhantomData, mem::MaybeUninit};
 
-use bitvec::{ vec::BitVec, bitvec };
+use bitvec::{bitvec, vec::BitVec};
 
-
-type MPHF = Function2<BitsFast, ShiftOnlyWrapped::<2>, DefaultCompressedArray, BuildDefaultSeededHasher>;
+type Mphf =
+    Function2<BitsFast, ShiftOnlyWrapped<2>, DefaultCompressedArray, BuildDefaultSeededHasher>;
 
 pub type VerifiedIndex<K> = FrozenIndex<WithKeys<K>>;
 pub type UnverifiedIndex<K> = FrozenIndex<NoKeys<K>>;
-
 
 pub struct FrozenIndex<S>
 where
     S: KeyStorage,
     S::Key: Hash + Eq + Clone + Send + Sync + Default,
 {
-    pub mphf: MPHF,
-    pub keys: S
+    pub mphf: Mphf,
+    pub keys: S,
 }
 
 impl<S> FrozenIndex<S>
@@ -39,8 +38,8 @@ where
     }
 }
 
-impl<K> FrozenIndex<WithKeys<K>> 
-where 
+impl<K> FrozenIndex<WithKeys<K>>
+where
     K: Hash + Eq + Clone + Send + Sync + Default,
 {
     #[inline]
@@ -49,12 +48,11 @@ where
 
         if self.keys.dead_key(idx) {
             return false;
-        } 
+        }
 
         self.keys.get(idx) == key
     }
 }
-
 
 pub trait KeyStorage {
     type Key;
@@ -66,21 +64,20 @@ pub trait KeyStorage {
     fn dead_key(&self, idx: usize) -> bool;
 }
 
-
 pub struct WithKeys<K> {
     keys: Box<[K]>,
     len: usize,
-    tombstone: BitVec
+    tombstone: BitVec,
 }
 
-impl<K> WithKeys<K> 
-where  
+impl<K> WithKeys<K>
+where
     K: Hash + Eq + Send + Sync + Clone + Default,
 {
     pub fn new_from_uninit(keys: Vec<MaybeUninit<K>>) -> Self {
         let n = keys.len();
 
-        let keys_k: Box<[K]> = keys // fixed size heap alloc for keys 
+        let keys_k: Box<[K]> = keys // fixed size heap alloc for keys
             .into_iter()
             .map(|maybe| unsafe { maybe.assume_init() })
             .collect::<Vec<K>>()
@@ -91,7 +88,7 @@ where
         Self {
             keys: keys_k,
             len: n,
-            tombstone
+            tombstone,
         }
     }
 
@@ -105,17 +102,17 @@ where
 pub struct NoKeys<K> {
     _ghost: PhantomData<K>,
     len: usize,
-    tombstone: BitVec
+    tombstone: BitVec,
 }
 
 impl<K> NoKeys<K> {
     pub fn new(len: usize) -> Self {
         let tombstone = bitvec![0; len];
-        
+
         Self {
             _ghost: PhantomData,
-            len: len,
-            tombstone
+            len,
+            tombstone,
         }
     }
 }
@@ -123,8 +120,6 @@ impl<K> NoKeys<K> {
 impl<K> KeyStorage for WithKeys<K> {
     type Key = K;
 
-
-    
     #[inline]
     fn get(&self, idx: usize) -> &K {
         &self.keys[idx]
@@ -191,4 +186,3 @@ impl<K> KeyStorage for NoKeys<K> {
         self.tombstone[idx]
     }
 }
-
