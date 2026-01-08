@@ -54,6 +54,16 @@ where
     }
 
     #[inline]
+    pub fn get_mut_value(&mut self, idx: usize) -> Option<&mut V> {
+        if self.init[idx] {
+            let v = unsafe { self.values.inner[idx].assume_init_mut() };
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
     pub fn get_values(&self) -> Vec<Option<V>> {
         self.values
             .inner
