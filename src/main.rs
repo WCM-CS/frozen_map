@@ -62,6 +62,35 @@ fn main() {
     frozen_map.iter_keys().for_each(|k| {
         println!("Key: {k}");
     });
+
+
+
+
+    let k = frozen_map.get(&"gamma").unwrap();
+    println!("{}", k);
+
+
+
+
+    let  i = frozen_map.get_mut(&"gamma");
+    let y = i.unwrap();    
+    *y += 1;
+
+        let k = frozen_map.get(&"gamma").unwrap();
+    println!("{}", k);
+
+
+    let keys = vec!["gamma", "delta", "void", "bump"];
+    let vals = vec![1, 2, 3, 4];
+
+    let t: FrozenMap<&str, i32> = FrozenMap::unsafe_init(keys, vals);    
+
+    t.iter_keys().for_each(|g| println!("{g}"));
+
+    t.iter().for_each(|f| println!("{:?}", f));
+
+
+
 }
 
 // verified hashmap - stores keys, values
