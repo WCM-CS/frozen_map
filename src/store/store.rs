@@ -94,7 +94,7 @@ pub struct ValueStruct<V>
 where
     V: Send + Sync + Clone + Default,
 {
-    inner: Vec<MaybeUninit<V>>,
+    inner: Box<[MaybeUninit<V>]>,
 }
 
 impl<V> ValueStruct<V>
@@ -102,6 +102,7 @@ where
     V: Send + Sync + Clone + Default,
 {
     fn new(values: Vec<MaybeUninit<V>>) -> Self {
-        Self { inner: values }
+        let inner= values.into_boxed_slice();
+        Self { inner }
     }
 }
