@@ -29,6 +29,55 @@ where
     K: Hash + Eq + Send + Sync + Clone + Default,
     V: Send + Sync + Clone + Default,
 {
+
+    #[inline]
+    pub fn unsafe_init(keys: Vec<K>, values: Vec<V>) -> Self { // only use if the key value pair indexes line up properly
+        let index_map: Function2<
+            BitsFast,
+            ShiftOnlyWrapped<2>,
+            DefaultCompressedArray,
+            BuildDefaultSeededHasher,
+        > = Function2::with_slice_p_threads_hash_sc(
+            &keys,
+            &Params::new(BitsFast(10), bits_per_seed_to_100_bucket_size(8)),
+            std::thread::available_parallelism().map_or(1, |v| v.into()),
+            BuildDefaultSeededHasher::default(),
+            ShiftOnlyWrapped::<2>,
+        );
+
+        //let mut sorted_keys = vec![K::default(); keys.len()];
+        // note this is expensive to double allocate keys for no good reason aka allocating a default just know the type then we overwrite it which is slow
+
+        // no need to build key vector
+
+        // build values vector
+        let mut sorted_values: Vec<MaybeUninit<V>> = Vec::with_capacity(keys.len()); // allocated memory for n elemens
+        unsafe {
+            sorted_values.set_len(keys.len());
+        } // changes the actual length of the vec to n length without any overhead
+
+        let init_bloom = bitvec![1; keys.len()];
+
+        keys.into_iter().zip(values.into_iter()).for_each(|(key, val)| {
+            let idx = index_map.get(&key);
+
+            //sorted_keys[idx].write(key);
+            sorted_values[idx].write(val);
+        });
+
+        let frozen_index = UnverifiedIndex {
+            mphf: index_map,
+            keys: NoKeys::new(sorted_values.len()),
+        };
+
+        let store = Store::new(sorted_values, init_bloom);
+
+        Self {
+            index: frozen_index,
+            store,
+        }
+    }
+
     #[inline]
     pub fn from_vec(keys: Vec<K>) -> Self {
         let index_map: Function2<
